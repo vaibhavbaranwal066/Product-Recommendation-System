@@ -67,33 +67,43 @@ else:
 # ---------------- Step 5: Semantic Recommendation ----------------
 def recommend_products(user_query, top_n=5):
     """
-    Generates semantic recommendations from Flipkart dataset.
-    Works for any real-world product text input.
+    Returns top-N semantic recommendations with
+    realistic descending similarity scores.
     """
+
     if not user_query.strip():
         return [("Please enter a valid product name", 0)]
 
-    # Add context keywords to help AI understand
-    enriched_query = user_query + " product item specification details"
+    # Enrich query for better semantic understanding
+    enriched_query = user_query.lower() + " product specification features model brand"
     query_embedding = model.encode(enriched_query, convert_to_tensor=True)
 
     # Compute cosine similarity
     cosine_scores = util.cos_sim(query_embedding, product_embeddings)[0]
     cosine_scores_np = cosine_scores.cpu().numpy()
 
-    # Sort and get top N results
-    top_indices = np.argsort(-cosine_scores_np)[:top_n]
+    # Sort all products by similarity (descending)
+    sorted_indices = np.argsort(-cosine_scores_np)
+
+    # Take top-N
+    top_indices = sorted_indices[:top_n]
+
+    # Get maximum score (best match)
+    max_score = cosine_scores_np[top_indices[0]]
 
     recommendations = []
     for idx in top_indices:
-        idx = int(idx)
-        name = df.iloc[idx]['product_name']
-        score = round(float(cosine_scores_np[idx]) * 100, 2)
-        recommendations.append((name, score))
+        raw_score = cosine_scores_np[idx]
+
+        # Relative scaling (keeps order, improves readability)
+        scaled_score = (raw_score / max_score) * 100
+
+        # Cap max score to avoid fake 100%
+        final_score = round(min(scaled_score, 99.0), 2)
+
+        name = df.iloc[int(idx)]['product_name']
+        recommendations.append((name, final_score))
 
     return recommendations
-
-
-
 
 
